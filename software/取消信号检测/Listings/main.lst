@@ -1,0 +1,502 @@
+C51 COMPILER V9.53.0.0   MAIN                                                              10/11/2019 21:34:14 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <reg51.h>
+   2          #include <stdio.h>
+   3          #include "reg51.h"
+   4          #include "intrins.h"
+   5          
+   6          #define H (1)
+   7          #define L (0)
+   8          
+   9          sbit TVP_PDN = P1^6;
+  10          sbit TVP_RESETB = P1^5;
+  11          sbit FLCOS_nRST = P1^2;
+  12          sbit FLCOS_SEN = P1^1;
+  13          sbit FLCOS_SCLK = P1^0;
+  14          sbit FLCOS_SDAT = P3^7;
+  15          sbit TVP_SDA = P3^3;
+  16          sbit TVP_SCL = P3^4;
+  17          sbit BL_U = P3^1;
+  18          sbit BL_D = P3^0;
+  19          
+  20          #define SDA TVP_SDA
+  21          #define SCL TVP_SCL
+  22          
+  23          
+  24          void delay_ms(unsigned int times);
+  25          void delay_10us(unsigned int times);
+  26          unsigned char iic_write_check(unsigned char addr, unsigned char reg, unsigned char val);
+  27          unsigned char iic_read_byte(unsigned char addr, unsigned char reg);
+  28          void iic_write_byte(unsigned char addr, unsigned char reg, unsigned char val);
+  29          
+  30          
+  31          void init_sys(void);
+  32          void spi_send_byte(unsigned char addr, unsigned char val);
+  33          void flcos_send(void);
+  34          unsigned char buf;
+  35          
+  36          
+  37          void main(void)
+  38          {
+  39   1        unsigned char val;
+  40   1        init_sys();
+  41   1        for(;;)
+  42   1        {
+  43   2        
+  44   2            delay_ms(10);
+  45   2            flcos_send();
+  46   2          
+  47   2          delay_ms(10);
+  48   2          if(BL_U == L)
+  49   2          {
+  50   3            val = iic_read_byte(0xB8, 0x09);
+  51   3            if((int)val + 3 > 255)
+  52   3            {
+  53   4              val = 255;
+  54   4            }
+C51 COMPILER V9.53.0.0   MAIN                                                              10/11/2019 21:34:14 PAGE 2   
+
+  55   3            else
+  56   3            {
+  57   4              val += 3;
+  58   4            }
+  59   3            iic_write_byte(0xB8, 0x09, val);  
+  60   3          }
+  61   2          else
+  62   2          {
+  63   3            if(BL_D == L)
+  64   3            {
+  65   4              val = iic_read_byte(0xB8, 0x09);
+  66   4              if((int)val - 3 < 0)
+  67   4              {
+  68   5                val = 0;
+  69   5              }
+  70   4              else
+  71   4              {
+  72   5                val -= 3;
+  73   5              }
+  74   4              iic_write_byte(0xB8, 0x09, val);    
+  75   4            }
+  76   3          }
+  77   2          delay_ms(10); 
+  78   2        }
+  79   1      
+  80   1      }
+  81          
+  82          void init_sys(void)
+  83          {
+  84   1      
+  85   1        TVP_SDA = H;
+  86   1        TVP_SCL = H;
+  87   1        FLCOS_SDAT = H;
+  88   1        FLCOS_SCLK = H;
+  89   1        FLCOS_SEN = H;
+  90   1        FLCOS_nRST = H;
+  91   1        TVP_RESETB = H;
+  92   1        TVP_PDN = H;
+  93   1        BL_U = H;
+  94   1        BL_D = H;
+  95   1        delay_ms(10);
+  96   1        TVP_RESETB = L;
+  97   1        delay_ms(10);
+  98   1        TVP_RESETB = H;
+  99   1        delay_ms(100);
+ 100   1      
+ 101   1        iic_write_check(0xB8, 0x03, 0xFD);
+ 102   1        iic_write_check(0xB8, 0x04, 0x00);
+ 103   1        iic_write_check(0xB8, 0x0D, 0x40);
+ 104   1        iic_write_check(0xB8, 0x12, 0x04);
+ 105   1        iic_write_check(0xB8, 0x16, 0x68);
+ 106   1        iic_write_check(0xB8, 0x09, 0xB1);
+ 107   1        //while(!iic_write_check(0xB8, 0x09, 0xB1));
+ 108   1      
+ 109   1        FLCOS_nRST = L;
+ 110   1        delay_ms(10);
+ 111   1        FLCOS_nRST = H;
+ 112   1        delay_ms(10);
+ 113   1      
+ 114   1      }
+ 115          
+ 116          void spi_send_byte(unsigned char addr, unsigned char val)
+C51 COMPILER V9.53.0.0   MAIN                                                              10/11/2019 21:34:14 PAGE 3   
+
+ 117          {
+ 118   1        int index;
+ 119   1        FLCOS_SEN = L;
+ 120   1        delay_10us(2);
+ 121   1      
+ 122   1        for(index = 7; index>=0; index--)
+ 123   1        {
+ 124   2          if((addr>>index)&0x1 == 1)
+ 125   2          {
+ 126   3            FLCOS_SDAT = H;
+ 127   3          }
+ 128   2          else
+ 129   2          {
+ 130   3            FLCOS_SDAT = L;
+ 131   3          }
+ 132   2          delay_10us(1);
+ 133   2          FLCOS_SCLK = H;
+ 134   2          delay_10us(1);
+ 135   2          FLCOS_SCLK = L;
+ 136   2          delay_10us(1);
+ 137   2        }
+ 138   1      
+ 139   1        delay_10us(2);
+ 140   1      
+ 141   1        for(index = 7; index>=0; index--)
+ 142   1        {
+ 143   2          if((val>>index)&0x1 == 1)
+ 144   2          {
+ 145   3            FLCOS_SDAT = H;
+ 146   3          }
+ 147   2          else
+ 148   2          {
+ 149   3            FLCOS_SDAT = L;
+ 150   3          }
+ 151   2          delay_10us(1);
+ 152   2          FLCOS_SCLK = H;
+ 153   2          delay_10us(1);
+ 154   2          FLCOS_SCLK = L;
+ 155   2          delay_10us(1);
+ 156   2        }
+ 157   1      
+ 158   1        delay_10us(2);
+ 159   1          FLCOS_SEN = H;
+ 160   1        delay_10us(2);
+ 161   1      }
+ 162          
+ 163          void flcos_send(void)
+ 164          { 
+ 165   1        spi_send_byte(0x01, 0x35);
+ 166   1        spi_send_byte(0x04, 0x08);
+ 167   1        spi_send_byte(0x05, 0x00);
+ 168   1        spi_send_byte(0x07, 0x08);
+ 169   1        spi_send_byte(0x08, 0xEB);
+ 170   1        spi_send_byte(0x09, 0x10);
+ 171   1        spi_send_byte(0x0A, 0x16);
+ 172   1        spi_send_byte(0x0B, 0x05);
+ 173   1        spi_send_byte(0x0C, 0x16);
+ 174   1        spi_send_byte(0x06, 0x48);
+ 175   1      }
+ 176          
+ 177          
+ 178          void delay_ms(unsigned int times)
+C51 COMPILER V9.53.0.0   MAIN                                                              10/11/2019 21:34:14 PAGE 4   
+
+ 179          {
+ 180   1        unsigned int count;
+ 181   1        while(times--)
+ 182   1        {
+ 183   2          count = 0x106;
+ 184   2          while(count--);
+ 185   2        }
+ 186   1      }
+ 187          
+ 188          
+ 189          void delay_10us(unsigned int times)
+ 190          {
+ 191   1        while(times--);
+ 192   1      }
+ 193          
+ 194          
+ 195          
+ 196          void iic_start(void)
+ 197          {
+ 198   1        SDA = H;
+ 199   1        SCL = H;
+ 200   1        delay_10us(1);
+ 201   1      
+ 202   1        SDA = L;
+ 203   1        delay_10us(1);
+ 204   1        SCL = L;
+ 205   1        delay_10us(1);
+ 206   1      }
+ 207          
+ 208          void iic_stop(void)
+ 209          {
+ 210   1        SDA = L;
+ 211   1        SCL = H;
+ 212   1        delay_10us(1);
+ 213   1        SDA = H;
+ 214   1        delay_10us(1);
+ 215   1      }
+ 216          
+ 217          unsigned char iic_read_byte(unsigned char addr, unsigned char reg)
+ 218          {
+ 219   1        int i;
+ 220   1        unsigned char ret;
+ 221   1      
+ 222   1        addr >>= 1;
+ 223   1        addr <<= 1;
+ 224   1        addr |= 0;
+ 225   1      
+ 226   1        iic_start();
+ 227   1      
+ 228   1        for(i = 7; i >= 0; i--)
+ 229   1        {
+ 230   2          if((addr>>i)&0x01 == 1)
+ 231   2          {
+ 232   3            SDA = H;
+ 233   3          }
+ 234   2          else
+ 235   2          {
+ 236   3            SDA = L;
+ 237   3          }
+ 238   2          delay_10us(1);
+ 239   2          SCL = L;
+ 240   2          delay_10us(1);
+C51 COMPILER V9.53.0.0   MAIN                                                              10/11/2019 21:34:14 PAGE 5   
+
+ 241   2          SCL = H;
+ 242   2          delay_10us(1);
+ 243   2          SCL = L;
+ 244   2          SDA = H;
+ 245   2          delay_10us(1);
+ 246   2        }
+ 247   1        
+ 248   1        while(SDA);
+ 249   1        delay_10us(1);
+ 250   1        SCL = L;
+ 251   1        delay_10us(1);
+ 252   1        SCL = H;
+ 253   1        delay_10us(1);
+ 254   1        SCL = L;
+ 255   1        delay_10us(1);
+ 256   1      
+ 257   1        for(i = 7; i >= 0; i--)
+ 258   1        {
+ 259   2          if((reg>>i)&0x01 == 1)
+ 260   2          {
+ 261   3            SDA = H;
+ 262   3          }
+ 263   2          else
+ 264   2          {
+ 265   3            SDA = L;
+ 266   3          }
+ 267   2          delay_10us(1);
+ 268   2          SCL = L;
+ 269   2          delay_10us(1);
+ 270   2          SCL = H;
+ 271   2          delay_10us(1);
+ 272   2          SCL = L;
+ 273   2          SDA = H;
+ 274   2          delay_10us(1);
+ 275   2        }
+ 276   1        
+ 277   1        while(SDA);
+ 278   1        delay_10us(1);
+ 279   1        SCL = L;
+ 280   1        delay_10us(1);
+ 281   1        SCL = H;
+ 282   1        delay_10us(1);
+ 283   1        SCL = L;
+ 284   1        delay_10us(1);
+ 285   1      
+ 286   1        //-----------------------------
+ 287   1        addr >>= 1;
+ 288   1        addr <<= 1;
+ 289   1        addr |= 1;
+ 290   1      
+ 291   1        iic_start();
+ 292   1      
+ 293   1        for(i = 7; i >= 0; i--)
+ 294   1        {
+ 295   2          if((addr>>i)&0x01 == 1)
+ 296   2          {
+ 297   3            SDA = H;
+ 298   3          }
+ 299   2          else
+ 300   2          {
+ 301   3            SDA = L;
+ 302   3          }
+C51 COMPILER V9.53.0.0   MAIN                                                              10/11/2019 21:34:14 PAGE 6   
+
+ 303   2          delay_10us(1);
+ 304   2          SCL = L;
+ 305   2          delay_10us(1);
+ 306   2          SCL = H;
+ 307   2          delay_10us(1);
+ 308   2          SCL = L;
+ 309   2          SDA = H;
+ 310   2          delay_10us(1);
+ 311   2        }
+ 312   1        
+ 313   1        while(SDA);
+ 314   1        delay_10us(1);
+ 315   1        SCL = L;
+ 316   1        delay_10us(1);
+ 317   1        SCL = H;
+ 318   1        delay_10us(1);
+ 319   1        SCL = L;
+ 320   1        delay_10us(100);
+ 321   1        
+ 322   1        ret = 0;
+ 323   1        for(i = 7; i >= 0; i--)
+ 324   1        {
+ 325   2          delay_10us(1);
+ 326   2          SCL = L;
+ 327   2          delay_10us(1);
+ 328   2          SCL = H;
+ 329   2          delay_10us(1);
+ 330   2          ret <<= 1;
+ 331   2          if(SDA == H)
+ 332   2          {
+ 333   3            ret |= 1;
+ 334   3          }   
+ 335   2        }
+ 336   1      
+ 337   1        delay_10us(1);
+ 338   1        SCL = L;
+ 339   1        delay_10us(1);
+ 340   1        SCL = H;
+ 341   1        delay_10us(1);
+ 342   1        SCL = L;
+ 343   1        delay_10us(1);
+ 344   1        
+ 345   1        iic_stop(); 
+ 346   1        
+ 347   1        return ret;   
+ 348   1      }
+ 349          
+ 350          void iic_write_byte(unsigned char addr, unsigned char reg, unsigned char val)
+ 351          {
+ 352   1        int i;
+ 353   1      
+ 354   1        addr >>= 1;
+ 355   1        addr <<= 1;
+ 356   1        addr |= 0;
+ 357   1      
+ 358   1        iic_start();
+ 359   1      
+ 360   1        for(i = 7; i >= 0; i--)
+ 361   1        {
+ 362   2          if((addr>>i)&0x01 == 1)
+ 363   2          {
+ 364   3            SDA = H;
+C51 COMPILER V9.53.0.0   MAIN                                                              10/11/2019 21:34:14 PAGE 7   
+
+ 365   3          }
+ 366   2          else
+ 367   2          {
+ 368   3            SDA = L;
+ 369   3          }
+ 370   2          delay_10us(1);
+ 371   2          SCL = L;
+ 372   2          delay_10us(1);
+ 373   2          SCL = H;
+ 374   2          delay_10us(1);
+ 375   2          SCL = L;
+ 376   2          SDA = H;
+ 377   2          delay_10us(1);
+ 378   2        }
+ 379   1        
+ 380   1        while(SDA);
+ 381   1        delay_10us(1);
+ 382   1        SCL = L;
+ 383   1        delay_10us(1);
+ 384   1        SCL = H;
+ 385   1        delay_10us(1);
+ 386   1        SCL = L;
+ 387   1        delay_10us(1);
+ 388   1      
+ 389   1        for(i = 7; i >= 0; i--)
+ 390   1        {
+ 391   2          if((reg>>i)&0x01 == 1)
+ 392   2          {
+ 393   3            SDA = H;
+ 394   3          }
+ 395   2          else
+ 396   2          {
+ 397   3            SDA = L;
+ 398   3          }
+ 399   2          delay_10us(1);
+ 400   2          SCL = L;
+ 401   2          delay_10us(1);
+ 402   2          SCL = H;
+ 403   2          delay_10us(1);
+ 404   2          SCL = L;
+ 405   2          SDA = H;
+ 406   2          delay_10us(1);
+ 407   2        }
+ 408   1        
+ 409   1        while(SDA);
+ 410   1        delay_10us(1);
+ 411   1        SCL = L;
+ 412   1        delay_10us(1);
+ 413   1        SCL = H;
+ 414   1        delay_10us(1);
+ 415   1        SCL = L;
+ 416   1        delay_10us(1);
+ 417   1      
+ 418   1        for(i = 7; i >= 0; i--)
+ 419   1        {
+ 420   2          if((val>>i)&0x01 == 1)
+ 421   2          {
+ 422   3            SDA = H;
+ 423   3          }
+ 424   2          else
+ 425   2          {
+ 426   3            SDA = L;
+C51 COMPILER V9.53.0.0   MAIN                                                              10/11/2019 21:34:14 PAGE 8   
+
+ 427   3          }
+ 428   2          delay_10us(1);
+ 429   2          SCL = L;
+ 430   2          delay_10us(1);
+ 431   2          SCL = H;
+ 432   2          delay_10us(1);
+ 433   2          SCL = L;
+ 434   2          SDA = H;
+ 435   2          delay_10us(1);
+ 436   2        }
+ 437   1        
+ 438   1        while(SDA);
+ 439   1        delay_10us(1);
+ 440   1        SCL = L;
+ 441   1        delay_10us(1);
+ 442   1        SCL = H;
+ 443   1        delay_10us(1);
+ 444   1        SCL = L;
+ 445   1        delay_10us(1);
+ 446   1        
+ 447   1        iic_stop();   
+ 448   1      }
+ 449          
+ 450          unsigned char iic_write_check(unsigned char addr, unsigned char reg, unsigned char val)
+ 451          {
+ 452   1        iic_write_byte(addr, reg, val);
+ 453   1        delay_ms(20);
+ 454   1        if(iic_read_byte(addr, reg) != val)
+ 455   1        {
+ 456   2      
+ 457   2          return 0;
+ 458   2        }
+ 459   1        else
+ 460   1        {
+ 461   2      
+ 462   2        }
+ 463   1        return 1;
+ 464   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1025    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      1       9
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
